@@ -184,7 +184,6 @@ class BagTimeline(QGraphicsScene):
 
     def file_size(self):
         with self._bag_lock:
-            x = sum(b.size() for b in self._bags)
             return sum(b.size() for b in self._bags)
 
     # TODO Rethink API and if these need to be visible
@@ -337,7 +336,7 @@ class BagTimeline(QGraphicsScene):
 
             return entry_bag, entry
 
-    def get_entry_after(self, t):
+    def get_entry_after(self, t, topic=None):
         """
         Access a bag entry
         :param t: time, ''rclpy.time.Time''
@@ -346,7 +345,7 @@ class BagTimeline(QGraphicsScene):
         with self._bag_lock:
             entry_bag, entry = None, None
             for bag in self._bags:
-                bag_entry = bag._get_entry_after(t)
+                bag_entry = bag._get_entry_after(t, topic)
                 if bag_entry and (not entry or bag_entry.timestamp < entry.timestamp):
                     entry_bag, entry = bag, bag_entry
 

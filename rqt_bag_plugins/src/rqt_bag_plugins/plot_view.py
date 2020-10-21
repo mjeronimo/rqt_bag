@@ -176,7 +176,7 @@ class PlotWidget(QWidget):
         while bag is None:
             bag, entry = self.timeline.get_entry(start_time, topic)
             if bag is None:
-                bag, entry = self.timeline.get_entry_after(start_time)
+                bag, entry = self.timeline.get_entry_after(start_time, topic)
                 start_time = Time(nanoseconds=entry.timestamp)
 
         self.bag = bag
@@ -433,7 +433,7 @@ class MessageTree(QTreeWidget):
 
     def _add_msg_object(self, parent, path, name, obj, obj_type):
         # Remove the leading underscore for display
-        label = name[1:]
+        label = name[1:] if name.startswith('_') else name
 
         if hasattr(obj, '__slots__'):
             subobjs = [(slot, getattr(obj, slot)) for slot in obj.__slots__]
