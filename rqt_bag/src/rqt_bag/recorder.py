@@ -59,6 +59,7 @@ from rclpy.duration import Duration
 from rqt_bag import bag_helper
 from rclpy.time import Time
 from rclpy.clock import Clock, ClockType
+from rclpy.qos import QoSHistoryPolicy, QoSDurabilityPolicy, QoSReliabilityPolicy, QoSLivelinessPolicy
 
 
 class Recorder(object):
@@ -115,14 +116,19 @@ class Recorder(object):
                 topic_info = {}
                 topic_info['topic_metadata'] = {}
                 topic_info['topic_metadata']['name'] = topic
+
                 # TODO(mjeronimo): could have multiple type names
                 topic_info['topic_metadata']['type'] = msg_type_names[0]
                 topic_info['topic_metadata']['serialization_format'] = self._serialization_format
+
+                # TODO(mjeronimo): add the offered_qos_profiles
                 topic_info['topic_metadata']['offered_qos_profiles'] = ""
                 bag_info['topics_with_message_count'].append(topic_info)
 
                 # Add the topic to the database
+                # TODO(mjeronimo): need qos info here when creating the topic
                 topic_metadata = rosbag2_py.TopicMetadata(name=topic, type=msg_type_names[0], serialization_format=self._serialization_format)
+
                 self._rosbag_writer.create_topic(topic_metadata)
 
         topic_info['message_count'] = 0
@@ -301,8 +307,27 @@ class Recorder(object):
 
                 # Write to the bag
                 with self._bag_lock:
-                    topic_metadata = rosbag2_py.TopicMetadata(name=topic, type=msg_type_name, serialization_format=self._serialization_format)
+                    # HERE:
+                    helper = self._subscriber_helpers[topic]
+                    #print(str(helper.qos_profile))
+
+                    qos_dict = {}
+                    qos_dict["history"] = 0 # helper.qos_profile.history
+                    qos_dict["depth"] = helper.qos_profile.depth
+                    qos_dict["reliability"] = 1 # helper.qos_profile.reliability
+                    qos_dict["durability"] = 1 # helper.qos_profile.durability
+                    qos_dict["lifespan"] = 0 # helper.qos_profile.lifespan
+                    qos_dict["deadline"] = 0 # helper.qos_profile.deadline
+                    qos_dict["liveliness"] = 1 # helper.qos_profile.liveliness
+                    qos_dict["liveliness_lease_duration"] = 0 # helper.qos_profile.liveliness_lease_duration
+                    qos_dict["avoid_ros_namespace_conventions"] = helper.qos_profile.avoid_ros_namespace_conventions
+
+                    print(qos_dict)
+                    qos_profile_yaml = yaml.dump([qos_dict], sort_keys=False)
+
+                    topic_metadata = rosbag2_py.TopicMetadata(name=topic, type=msg_type_name, serialization_format=self._serialization_format, offered_qos_profiles=qos_profile_yaml)
                     self._rosbag_writer.create_topic(topic_metadata)
+
                     serialized_msg = serialize_message(msg)
                     self._rosbag_writer.write(topic, serialized_msg, t.nanoseconds)
 
@@ -325,7 +350,54 @@ class _SubscriberHelper(object):
         self.topic = topic
         self.msg_type_name = msg_type_name
         self.msg_type = get_message(msg_type_name)
-        self.subscriber = node.create_subscription(self.msg_type, topic, self.callback, qos_profile_system_default)
+
+        # Attempt to use the same QoS settings as the publisher (?)
+        info = node.get_publishers_info_by_topic(topic)
+        if info:
+            self.qos_profile = info[0].qos_profile
+
+            self.qos_profile.history = QoSHistoryPolicy.RMW_QOS_POLICY_HISTORY_SYSTEM_DEFAULT
+            self.qos_profile.depth = 0
+            #self.qos_profile.reliability = QoSReliabilityPolicy.RMW_QOS_POLICY_RELIABILITY_SYSTEM_DEFAULT
+            #self.qos_profile.durability = QoSDurabilityPolicy.RMW_QOS_POLICY_DURABILITY_SYSTEM_DEFAULT
+            self.qos_profile.lifespan = Duration(nanoseconds=0)
+            self.qos_profile.deadline = Duration(nanoseconds=0)
+            #self.qos_profile.liveliness = QoSLivelinessPolicy.RMW_QOS_POLICY_LIVELINESS_SYSTEM_DEFAULT
+            self.qos_profile.liveliness_lease_duration = Duration(nanoseconds=0)
+            #self.qos_profile.avoid_ros_namespace_conventions = False
+
+            self.subscriber = node.create_subscription(self.msg_type, topic, self.callback, self.qos_profile)
+
 
     def callback(self, msg):
         self.recorder._record(self.topic, msg, self.msg_type_name)
+
+
+
+#print("topic: {}".format(topic))
+#print(" my qos")
+#print(self.qos_profile)
+#print("\n")
+#print(" system_default:")
+#print(qos_profile_system_default)
+
+#
+# std::string Recorder::serialized_offered_qos_profiles_for_topic(const std::string & topic_name)
+# {
+#   YAML::Node offered_qos_profiles;
+#   auto endpoints = node_->get_publishers_info_by_topic(topic_name);
+#   for (const auto & info : endpoints) {
+#     offered_qos_profiles.push_back(Rosbag2QoS(info.qos_profile()));
+#   }
+#   return YAML::Dump(offered_qos_profiles);
+# }
+# 
+# rclcpp::QoS Recorder::subscription_qos_for_topic(const std::string & topic_name) const
+# {
+#   if (topic_qos_profile_overrides_.count(topic_name)) {
+#     return topic_qos_profile_overrides_.at(topic_name);
+#   }
+#   return Rosbag2QoS::adapt_request_to_offers(
+#     topic_name, node_->get_publishers_info_by_topic(topic_name));
+# }
+# 
