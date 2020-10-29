@@ -102,7 +102,7 @@ class PlotView(MessageView):
 
         parent.layout().addWidget(self.plot_widget)
 
-    def message_viewed(self, bag, entry, ros_message, msg_type_name, topic):
+    def message_viewed(self, *, entry, ros_message, msg_type_name, **kwargs):
         """
         refreshes the plot
         """
@@ -519,7 +519,7 @@ class MessageTree(QTreeWidget):
             pass
         else:
             # Strip the leading underscore from each of the path segments
-            segments = [segment[1:] for segment in self.get_item_path(item).split('.')]
+            segments = [segment[1:] if segment[0] == '_' else segment for segment in self.get_item_path(item).split('.')]
             path  = '.'.join(segments)
 
             if item.checkState(column) == Qt.Checked:

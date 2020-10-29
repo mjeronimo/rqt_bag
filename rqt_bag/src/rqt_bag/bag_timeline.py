@@ -269,7 +269,7 @@ class BagTimeline(QGraphicsScene):
                 if bag_end_time is not None and bag_end_time < start_stamp:
                     continue
 
-                # Get all of the entries for the specified topics. When opening multiple
+                # Get all of the entries for each topic. When opening multiple
                 # bags, the requested topic may not be in a given bag database 
                 for topic in topics:
                     entries = b._get_entries(start_stamp, end_stamp, topic)
@@ -756,8 +756,8 @@ class BagTimeline(QGraphicsScene):
                 except Exception as ex:
                     qWarning('Error calling timeline_changed on %s: %s' % (type(listener), str(ex)))
 
-        # Reset the zoom level unconditionally so that when recording and exceeding the bounds of 
-        # the current timeline display, the zoom level is adjusted automatically
+        # Dynamically resize the timeline, if necessary, to make visible any new messages
+        # that might otherwise have exceeded the bounds of the window
         self.reset_zoom()
 
     # Views / listeners
